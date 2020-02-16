@@ -18,7 +18,8 @@ function deleteSheets(sheetNameToKeep) {
 //  sheetNameToKeep = 'MasterSheet'
   var ss = SpreadsheetApp.getActive();
   var sheets = ss.getSheets();
-  for (i=0; i < sheets.length; i++) {
+  var nsheets = sheets.length;
+  for (i=0; i < nsheets; i++) {
     if (sheets[i].getSheetName() != sheetNameToKeep) {
       ss.deleteSheet(sheets[i])
     }
@@ -32,8 +33,34 @@ function readDHIA() {
   DHIA_FOLDER_ID = '1AdV9v9aNSmmSEpKivd87wGguSUnGZxWF';
   DATE_LINE_INDEX = 4;
   HEADER_LINE_INDEX = 6;
+//  FINAL_HEADER = ['LACT', 'PEN', 'BNAME', 'DIM', 'MILK', 'PMILK', 'SCC', 'RPRO', 'LDTM', '305ME', 'BRDAT', 'SID', 'TBRD', 'LBDAT', 'LSIR', 'PSCC', 'DRY60', 'DDAT', 'DUEIF', 'FDAT', 'CALF'];
   
-  masterArray = [];
+  
+  FINAL_HEADER = [
+    {varname: 'lact', dispname: 'LACT', order: 1},
+    {varname: 'pen', dispname: 'PEN', order: 2},
+    {varname: 'bname', dispname: 'BNAME', order: 3},
+    {varname: 'dim', dispname: 'DIM', order: 4},
+    {varname: 'milk', dispname: 'MILK', order: 5},
+    {varname: 'pmilk', dispname: 'PMILK', order: 6},
+    {varname: 'scc', dispname: 'SCC', order: 7},
+    {varname: 'rpro', dispname: 'RPRO', order: 8},
+    {varname: 'ltdm', dispname: 'LTDM', order: 9},
+    {varname: 'x05me', dispname: '305ME', order: 10},
+    {varname: 'brdat', dispname: 'BRDAT', order: 11},
+    {varname: 'sid', dispname: 'SID', order: 12},
+    {varname: 'tbrd', dispname: 'TBRD', order: 13},
+    {varname: 'lbdat', dispname: 'LBDAT', order: 14},
+    {varname: 'lsir', dispname: 'LSIR', order: 15},
+    {varname: 'pscc', dispname: 'PSCC', order: 16},
+    {varname: 'dry60', dispname: 'DRY60', order: 17},
+    {varname: 'ddat', dispname: 'DDAT', order: 18},
+    {varname: 'dueif', dispname: 'DUEIF', order: 19},
+    {varname: 'fdat', dispname: 'FDAT', order: 20},
+    {varname: 'calf', dispname: 'CALF', order: 21}
+  ];
+  //-----
+  cumArray = [];
   
   deleteSheets(SHEET_NAME_TO_KEEP);
   
@@ -50,10 +77,95 @@ function readDHIA() {
       str = file.getBlob().getDataAsString();
       newData = parseText(str);
       newArray = arrayToObjectArray(newData, true);
-      Logger.log(newArray);
-//      masterArray = appendArray(masterArray, newData);
+      cumArray = appendArray(cumArray, newArray);
     }
   }
+
+  processedArray = makeObjectArray(cumArray);
+  spreadsheetArray = makeSpreadsheetArray(processedArray, FINAL_HEADER);
+  
+  var ss = SpreadsheetApp;
+  var sht = ss.getActiveSpreadsheet().insertSheet();
+  //Print the completed array to the spreadsheet
+  sht.getRange(1, 1, spreadsheetArray.length, spreadsheetArray[1].length).setValues(spreadsheetArray);
+}
+
+function makeObjectArray(array) {
+  var arr = [];
+  var len = array.length;
+  for (i=0; i<len; i++) {
+    var row = array[i];
+    arr.push({
+      lact: row['LACT'] | row['L'],
+      pen: row['PEN'],
+      bname: row['BNAME'],
+      dim: row['DIM'],
+      milk: row['MILK'],
+      pmilk: row['PMILK'],
+      scc: row['SCC'],
+      rpro: row['RPRO'],
+      ltdm: row['LDTM'],
+      x05me: row['305ME'],
+      
+      brdat: row['BRDAT'],
+      sid: row['SID'],
+      tbrd: row['TBRD'],
+      lbdat: row['LBDAT'],
+      lsir: row['LSIR'],
+      
+      pscc: row['PSCC'],
+      dry60: row['DRY60'],
+      ddat: row['DDAT'],
+      
+      dueif: row['DUEIF'],
+      fdat: row['FDAT'],
+      calf: row['CALF']
+    });
+  }
+  return arr;
+}
+
+function makeSpreadsheetArray(objArray, headerConfig) {
+  
+  // Determine the number of rows of data and the number of variables in the final header
+  var nrows = objArray.length;
+  var nvars = headerConfig.length;
+  
+  var output = [];
+  // for each row + 1 (for the header) make an empty value in the output array
+  for (i=0; i < nrows+1; i++) {output.push('')};
+  
+  //sort the header array by the 'order' property
+  headerConfig.sort(function(a, b) {return a.order - b.order});
+  
+  // The first row of the output array will be the header to be displayed in the spreadsheet
+  var header = headerConfig.map(a => a.dispname);
+  output[0] = header;
+
+  // Iterate through each row in the data
+  for (i=0; i < nrows; i++) {
+    var rowOutput = [];
+    var currentRow = objArray[i];
+    // Then iterate through each variable to be extracted
+    for (j=0; j < nvars; j++) {
+      var currentVar = headerConfig[j]['varname'];
+      // Add each extracted variable to the row output array
+      rowOutput.push(currentRow[currentVar]);
+    }
+    //Offset the row by 1 since the first row is the header
+    output[i+1] = rowOutput;
+  }
+  return output;
+}
+
+
+function appendArray(oldArray, newArray) {
+  var nRowNew = newArray.length;
+  
+  for (i=0; i<nRowNew; i++) {
+    oldArray.push(newArray[i]);
+  }  
+  return oldArray;
 }
 
 
@@ -119,9 +231,6 @@ function parseText(str) {
   var keepRows = indicesOf(searchForLinesToRemove, -1);
 
   var dataArray = createDataArray(lines, header, start, widths, keepRows);
-  
-//  var masterArray = [];
-//  var dataArray = combineArrays(dataArray)
 //  Logger.log(dataArray);
   
   var ss = SpreadsheetApp;
@@ -156,10 +265,9 @@ function arrayToObjectArray(array, containsHeader) {
 	}
   
   var arrObj = [];
-  for (i=0; i < array.length; i++) {
+  var len = array.length;
+  for (i=0; i < len; i++) {
     line = array[i]
-//  }
-//	array.forEach((line) => {
 		arrObj.push({});
 		for (j=0; j < line.length; j++) {
 			arrObj[arrObj.length-1][header[j]] = line[j];
@@ -168,17 +276,15 @@ function arrayToObjectArray(array, containsHeader) {
 	return arrObj;
 }
 
-//function appendArray(oldArray, newArray) {
-//  for (i=0; i < newArray.length; i++) {
-//    oldArray.push({
-//      lact: newArray[i]['LACT'],
-//      pen: newArray[i]['PEN']
-//    
-//    });
-//  }
-//
-//
-//}
+function appendArray(oldArray, newArray) {
+  var nRowNew = newArray.length;
+  
+  for (i=0; i < nRowNew; i++) {
+    oldArray.push(newArray[i]);
+  }
+  return oldArray;
+}
+
 
 // Parses a line into an array, using the start position and column widths
 function parseLine(line, arrStart, arrWidths) {
