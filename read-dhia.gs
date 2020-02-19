@@ -33,8 +33,6 @@ function readDHIA() {
   DHIA_FOLDER_ID = '1AdV9v9aNSmmSEpKivd87wGguSUnGZxWF';
   DATE_LINE_INDEX = 4;
   HEADER_LINE_INDEX = 6;
-//  FINAL_HEADER = ['LACT', 'PEN', 'BNAME', 'DIM', 'MILK', 'PMILK', 'SCC', 'RPRO', 'LDTM', '305ME', 'BRDAT', 'SID', 'TBRD', 'LBDAT', 'LSIR', 'PSCC', 'DRY60', 'DDAT', 'DUEIF', 'FDAT', 'CALF'];
-  
   
   FINAL_HEADER = [
     {varname: 'lact', dispname: 'LACT', order: 1},
@@ -82,12 +80,17 @@ function readDHIA() {
   }
 
   processedArray = makeObjectArray(cumArray);
-  spreadsheetArray = makeSpreadsheetArray(processedArray, FINAL_HEADER);
+  consolidatedArray = consolidateObjects(processedArray, 'bname');
+  spreadsheetArray = makeSpreadsheetArray(consolidatedArray, FINAL_HEADER);
   
   var ss = SpreadsheetApp;
   var sht = ss.getActiveSpreadsheet().insertSheet();
   //Print the completed array to the spreadsheet
   sht.getRange(1, 1, spreadsheetArray.length, spreadsheetArray[1].length).setValues(spreadsheetArray);
+  
+  old = makeSpreadsheetArray(processedArray, FINAL_HEADER);
+  var sht2 = ss.getActiveSpreadsheet().insertSheet();
+  sht2.getRange(1, 1, old.length, old[1].length).setValues(old);
 }
 
 function makeObjectArray(array) {
@@ -104,7 +107,7 @@ function makeObjectArray(array) {
       pmilk: row['PMILK'],
       scc: row['SCC'],
       rpro: row['RPRO'],
-      ltdm: row['LDTM'],
+      ltdm: row['LTDM'],
       x05me: row['305ME'],
       
       brdat: row['BRDAT'],
@@ -158,15 +161,35 @@ function makeSpreadsheetArray(objArray, headerConfig) {
   return output;
 }
 
+//*******************************************************
+//*******************************************************
+//*******************************************************
+//*******************************************************
 // Consolidates objects within an object array, so that there is only one object for each unique ID
 // Allows the user to determine the object key that is the ID
 function consolidateObjects(objArray, idVar) {
+  var output = [];
   //Returns an array of all IDs in the object array
   var allIds = objArray.map(a => a[idVar]);
   //Returns an array of the unique values from the array of IDs above
   var allIds = [...new Set(allIds)];
-  
+  var nIds = allIds.length;
+  for (i=0; i<nIds; i++) {
+    var id = allIds[i];
+    var objFiltered = objArray.filter(a => {return a[idVar] == id});
+    var nFiltered = objFiltered.length;
+    
+    var blob = objFiltered[0];
+    while (j < nFiltered-1) {
+      blob = {...blob, ...objFiltered[j+1]};
+    }
+    output.push(blob);
+  }
+  return output;
 }
+//*******************************************************
+//*******************************************************
+//*******************************************************
 
 function appendArray(oldArray, newArray) {
   var nRowNew = newArray.length;
