@@ -158,6 +158,15 @@ function makeSpreadsheetArray(objArray, headerConfig) {
   return output;
 }
 
+// Consolidates objects within an object array, so that there is only one object for each unique ID
+// Allows the user to determine the object key that is the ID
+function consolidateObjects(objArray, idVar) {
+  //Returns an array of all IDs in the object array
+  var allIds = objArray.map(a => a[idVar]);
+  //Returns an array of the unique values from the array of IDs above
+  var allIds = [...new Set(allIds)];
+  
+}
 
 function appendArray(oldArray, newArray) {
   var nRowNew = newArray.length;
