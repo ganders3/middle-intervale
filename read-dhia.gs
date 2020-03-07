@@ -27,7 +27,7 @@ function deleteSheets(sheetNameToKeep) {
 
 // A function to read in DHIA files
 function readDHIA() {
-  SHEET_NAME_TO_KEEP = 'MasterSheet';
+  SHEET_NAME_TO_KEEP = 'PreviousData';
   DHIA_FOLDER_ID = '1AdV9v9aNSmmSEpKivd87wGguSUnGZxWF';
   DATE_LINE_INDEX = 4;
   HEADER_LINE_INDEX = 6;
@@ -83,13 +83,9 @@ function readDHIA() {
   spreadsheetArray = makeSpreadsheetArray(consolidatedArray, FINAL_HEADER);
   
   var ss = SpreadsheetApp;
-  var sht = ss.getActiveSpreadsheet().insertSheet();
+  var sht = ss.getActiveSpreadsheet().insertSheet('NewData');
   //Print the completed array to the spreadsheet
   sht.getRange(1, 1, spreadsheetArray.length, spreadsheetArray[1].length).setValues(spreadsheetArray);
-  
-//  old = makeSpreadsheetArray(processedArray, FINAL_HEADER);
-//  var sht2 = ss.getActiveSpreadsheet().insertSheet();
-//  sht2.getRange(1, 1, old.length, old[1].length).setValues(old);
 }
 
 function makeObjectArray(array) {
@@ -331,10 +327,6 @@ function parseText(str) {
   var keepRows = indicesOf(searchForLinesToRemove, -1);
 
   var dataArray = createDataArray(lines, header, start, widths, keepRows);
-  
-//  var ss = SpreadsheetApp;
-//  var sht = ss.getActiveSpreadsheet().insertSheet();
-//  sht.getRange(1, 1, dataArray.length, dataArray[1].length).setValues(dataArray);
   
   return dataArray;
 
