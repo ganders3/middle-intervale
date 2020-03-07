@@ -8,7 +8,7 @@ function onOpen() {
 function initMenu(){
   var ui = SpreadsheetApp.getUi();
   var menu = ui.createMenu('Middle Intervale Macros');
-  menu.addItem('Read DHIA Files', 'readDHIA');
+  menu.addItem('Step 1: Read DHIA Files', 'readDHIA');
   
   menu.addToUi();
 }
@@ -20,9 +20,7 @@ function deleteSheets(sheetNameToKeep) {
   var sheets = ss.getSheets();
   var nsheets = sheets.length;
   for (i=0; i < nsheets; i++) {
-    if (sheets[i].getSheetName() != sheetNameToKeep) {
-      ss.deleteSheet(sheets[i])
-    }
+    if (sheets[i].getSheetName() != sheetNameToKeep) {ss.deleteSheet(sheets[i])}
   }
 }
 
@@ -35,9 +33,9 @@ function readDHIA() {
   HEADER_LINE_INDEX = 6;
   
   FINAL_HEADER = [
-    {varname: 'lact', dispname: 'LACT', order: 1},
-    {varname: 'pen', dispname: 'PEN', order: 2},
-    {varname: 'bname', dispname: 'BNAME', order: 3},
+    {varname: 'bname', dispname: 'BNAME', order: 1},
+    {varname: 'lact', dispname: 'LACT', order: 2},
+    {varname: 'pen', dispname: 'PEN', order: 3},
     {varname: 'dim', dispname: 'DIM', order: 4},
     {varname: 'milk', dispname: 'MILK', order: 5},
     {varname: 'pmilk', dispname: 'PMILK', order: 6},
@@ -80,6 +78,7 @@ function readDHIA() {
   }
 
   processedArray = makeObjectArray(cumArray);
+  processedArray = fixSpecificData(processedArray);
   consolidatedArray = consolidateObjects(processedArray, 'bname');
   spreadsheetArray = makeSpreadsheetArray(consolidatedArray, FINAL_HEADER);
   
@@ -88,9 +87,9 @@ function readDHIA() {
   //Print the completed array to the spreadsheet
   sht.getRange(1, 1, spreadsheetArray.length, spreadsheetArray[1].length).setValues(spreadsheetArray);
   
-  old = makeSpreadsheetArray(processedArray, FINAL_HEADER);
-  var sht2 = ss.getActiveSpreadsheet().insertSheet();
-  sht2.getRange(1, 1, old.length, old[1].length).setValues(old);
+//  old = makeSpreadsheetArray(processedArray, FINAL_HEADER);
+//  var sht2 = ss.getActiveSpreadsheet().insertSheet();
+//  sht2.getRange(1, 1, old.length, old[1].length).setValues(old);
 }
 
 function makeObjectArray(array) {
@@ -98,6 +97,7 @@ function makeObjectArray(array) {
   var len = array.length;
   for (i=0; i<len; i++) {
     var row = array[i];
+
     arr.push({
       lact: row['LACT'] | row['L'],
       pen: row['PEN'],
@@ -128,8 +128,7 @@ function makeObjectArray(array) {
   return arr;
 }
 
-function makeSpreadsheetArray(objArray, headerConfig) {
-  
+function makeSpreadsheetArray(objArray, headerConfig) {  
   // Determine the number of rows of data and the number of variables in the final header
   var nrows = objArray.length;
   var nvars = headerConfig.length;
@@ -161,10 +160,75 @@ function makeSpreadsheetArray(objArray, headerConfig) {
   return output;
 }
 
-//*******************************************************
-//*******************************************************
-//*******************************************************
-//*******************************************************
+function fixSpecificData(objArray) {
+  //==================Fix lact values - replace 0 with the correct value=======================
+  //Find all bnames
+  var bnames = objArray.map(a => a.bname);
+  //Returns an array of the unique values from the array of bnames above
+  bnames = [...new Set(bnames)];
+  //Iterate through each bname
+  var nB = bnames.length;
+  for (i=0; i<nB; i++) {
+    var bn = bnames[i];
+    var objFiltered = objArray.filter(a => {return a.bname == bn});
+    //Find all lact values within the current bname
+    var lacts = objFiltered.map(a => a.lact);
+    var correctLact = Math.max(...lacts);
+    objArray = updateData(objArray, bn, correctLact);
+  }
+  
+  //Update each row in the object array that matches the bname, to give it the correct lact value
+  function updateData(arr, bn, l) {
+    var len = arr.length;
+    for (j=0; j<len; j++) {
+      if(arr[j].bname == bn) {arr[j].lact = l}
+    }
+    return arr;
+  }
+  //===============================================================================
+  return objArray;
+}
+
+// Join 2 objects on a specified variable
+function joinOn(obj1, obj2, idVar) {
+  var output = {};
+  //Check whether arrays each contain the id variable specified, and whether it is the same - if not, return an empty array
+  if (obj1[idVar] == undefined || obj2[idVar] == undefined || obj1[idVar] != obj2[idVar]) {
+    return output;
+  // If the first object exists but not the 2nd, just use the 1st
+  } else if (obj1.length != 0 && obj2.length == 0) {
+    return obj1;
+  // If the 2nd object exists but not the first, just use the 2nd
+  } else if (obj2.length == 0 && obj2.length != 0) {
+    return obj2;
+  // If all required components exist (both objects, with matching id variables), proceed to join them
+  } else {
+    // Iterate through each key in the first object
+    for (key in obj1) {
+      if (isEmpty(obj1[key])) {
+        if (!isEmpty(obj2[key])) {
+          output[key] = obj2[key];
+        }
+      } else {
+        output[key] = obj1[key];
+      }
+    }
+
+    // Iterate through each key in the second object    
+    for (key in obj2) {
+      if (isEmpty(obj2[key])) {
+        if (!isEmpty(obj1[key])) {
+          output[key] = obj1[key];
+        }
+      } else {
+        output[key] = obj2[key];
+      }
+    }
+  }
+  return output;
+}
+
+
 // Consolidates objects within an object array, so that there is only one object for each unique ID
 // Allows the user to determine the object key that is the ID
 function consolidateObjects(objArray, idVar) {
@@ -173,23 +237,27 @@ function consolidateObjects(objArray, idVar) {
   var allIds = objArray.map(a => a[idVar]);
   //Returns an array of the unique values from the array of IDs above
   var allIds = [...new Set(allIds)];
+  
+  // Iteratre through each id and filter to find only those rows with matching ids
   var nIds = allIds.length;
-  for (i=0; i<nIds; i++) {
+  for (i=0; i<nIds; i++) { 
     var id = allIds[i];
+    // Filter to find objects with matching id
     var objFiltered = objArray.filter(a => {return a[idVar] == id});
+    // Iterate through each matched row (object)
     var nFiltered = objFiltered.length;
-    
     var blob = objFiltered[0];
+    var j = 0;
     while (j < nFiltered-1) {
-      blob = {...blob, ...objFiltered[j+1]};
+      var next = objFiltered[j+1];
+      blob = joinOn(blob, next, idVar);
+      j++;
     }
     output.push(blob);
   }
   return output;
 }
-//*******************************************************
-//*******************************************************
-//*******************************************************
+
 
 function appendArray(oldArray, newArray) {
   var nRowNew = newArray.length;
@@ -263,11 +331,10 @@ function parseText(str) {
   var keepRows = indicesOf(searchForLinesToRemove, -1);
 
   var dataArray = createDataArray(lines, header, start, widths, keepRows);
-//  Logger.log(dataArray);
   
-  var ss = SpreadsheetApp;
-  var sht = ss.getActiveSpreadsheet().insertSheet();
-  sht.getRange(1, 1, dataArray.length, dataArray[1].length).setValues(dataArray);
+//  var ss = SpreadsheetApp;
+//  var sht = ss.getActiveSpreadsheet().insertSheet();
+//  sht.getRange(1, 1, dataArray.length, dataArray[1].length).setValues(dataArray);
   
   return dataArray;
 
@@ -357,4 +424,8 @@ function startIndices(arrLengths, arrCumsum) {
     arr[i] = arrCumsum[i] - arrLengths[i] + i;
   }
   return arr;
+}
+
+function isEmpty(x) {
+    return (!x || x.length === 0);
 }
